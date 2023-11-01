@@ -276,8 +276,8 @@ class FlowDenoising(Denoising):
 
     def filter_along_Z_slice(self, z):
 
-        denoised_image, _ = self.image_denoiser.filter(
-            noisy_image=self.filtered_vol[z, :, :],
+        self.filtered_vol[z, :, :], _ = self.image_denoiser.filter(
+            noisy_image=self.vol[z, :, :],
             RD_iters=self.iters,
             RD_sigma=self.sigma)
 
@@ -286,8 +286,8 @@ class FlowDenoising(Denoising):
 
     def filter_along_Y_slice(self, y):
 
-        denoised_image, _ = self.image_denoiser.filter(
-            noisy_image=self.filtered_vol[:, y, :],
+        self.filtered_vol[:, y, :], _ = self.image_denoiser.filter(
+            noisy_image=self.vol[:, y, :],
             RD_iters=self.iters,
             RD_sigma=self.sigma)
 
@@ -296,8 +296,8 @@ class FlowDenoising(Denoising):
 
     def filter_along_X_slice(self, x):
 
-        denoised_image, _ = self.image_denoiser.filter(
-            noisy_image=self.filtered_vol[:, :, x],
+        self.filtered_vol[:, :, x], _ = self.image_denoiser.filter(
+            noisy_image=self.vol[:, :, x],
             RD_iters=self.iters,
             RD_sigma=self.sigma)
 
@@ -461,8 +461,8 @@ if __name__ == "__main__":
     if args.no_OF:
         fd = GaussianDenoising(number_of_processes, kernels)
     else:
-        iters = 5
-        sigma = 2.0
+        iters = 25
+        sigma = 1.0
         fd = FlowDenoising(number_of_processes, l, w, iters, sigma)
 
     if __debug__:
