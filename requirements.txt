@@ -1,0 +1,5 @@
+numpy
+opencv-python
+mrcfile
+scikit-image
+image_denoising @ git+https://github.com/microscopy-processing/image_denoising@main#egg=image_denoising
