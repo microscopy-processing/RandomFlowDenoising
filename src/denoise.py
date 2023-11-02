@@ -241,10 +241,14 @@ class Denoising():
         #print("1", np.max(self.filtered_vol), self.filtered_vol.data)
         self.filter_along_Z()
         #print("2", np.max(self.filtered_vol), self.filtered_vol.data)
-        self.vol[...] = self.filtered_vol[...]
+        #self.vol[...] = self.filtered_vol[...]
+        fvZ = self.filtered_vol.copy()
         self.filter_along_Y()
-        self.vol[...] = self.filtered_vol[...]
+        fvY = self.filtered_vol.copy()
+        #self.vol[...] = self.filtered_vol[...]
         self.filter_along_X()
+        fvX = self.filtered_vol.copy()
+        self.filtered_vol = (fvZ + fvY + fvX)/3
         return self.filtered_vol
         #return self.vol
 
@@ -263,7 +267,7 @@ class Denoising():
 
 class FlowDenoising(Denoising):
 
-    def __init__(self, number_of_processes, l, w, iters, sigma):
+    def __init__(self, number_of_processes, l, w, iters, sigma, verbosity):
         super().__init__(number_of_processes)
         self.l = l
         self.w = w
@@ -272,7 +276,8 @@ class FlowDenoising(Denoising):
         self.image_denoiser = image_denoising.OF_random.Filter_Monochrome_Image(
             levels=l,
             window_side=w,
-            poly_sigma=1.5)
+            poly_sigma=1.5,
+            verbosity=verbosity)
 
     def filter_along_Z_slice(self, z):
 
@@ -333,8 +338,17 @@ parser.add_argument("-l", "--levels", type=int_or_str,
 parser.add_argument("-w", "--winsize", type=int_or_str,
                     help="Size of the window used by the optical flow estimator",
                     default=OF_WINDOW_SIZE)
+parser.add_argument("-f", "--farneback_iters", type=int_or_str,
+                    help="Number of iterations of Farneback in each level of the pyramid",
+                    default=FARNEBACK_ITERS)
+parser.add_argument("-l", "--farneback_poly_n", type=int_or_str,
+                    help="Size of the pixel neighborhood used to find polynomial expansion in each pixel",
+                    default=FARNEBACK_POLY_N)
+parser.add_argument("-l", "--farneback_sigma", type=int_or_str,
+                    help="Standard deviation of the Gaussian basis used in the polynomial expansion",
+                    default=FARNEBACK_SIGMA)
 parser.add_argument("-v", "--verbosity", type=int_or_str,
-                    help="Verbosity level", default=0)
+                    help=f"Verbosity level (chose between CRITICAL={logging.CRITICAL}, ERROR={logging.ERROR}, WARNING={logging.WARNING}, INFO={logging.INFO}, and DEBUG={logging.DEBUG})", default=logging.INFO)
 parser.add_argument("-n", "--no_OF", action="store_true", help="Disable optical flow compensation")
 parser.add_argument("-m", "--memory_map",
                     action="store_true",
@@ -461,9 +475,11 @@ if __name__ == "__main__":
     if args.no_OF:
         fd = GaussianDenoising(number_of_processes, kernels)
     else:
-        iters = 25
-        sigma = 1.0
-        fd = FlowDenoising(number_of_processes, l, w, iters, sigma)
+        iters = 5
+        sigma = 0.5
+        fd = FlowDenoising(number_of_processes,
+                           l, w, iters, sigma,
+                           args.verbosity)
 
     if __debug__:
         thread = threading.Thread(target=fd.feedback)
@@ -518,3 +534,10 @@ if __name__ == "__main__":
     fd.close()
     done = True
     print("done")
+    print(f"levels={l}")
+    print(f"window_side={w}")
+    print(f"Farneback iters={farneback_iters}")
+    print(f"Farneback poly_n={farneback_poly_n}")
+    print(f"Farneback poly_sigma={poly_sigma}")
+    print(f"RD iters={iters}")
+    print(f"RD sigmas={sigma}")
