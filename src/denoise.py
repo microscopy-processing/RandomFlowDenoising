@@ -40,15 +40,13 @@ import image_denoising
 done = False
 
 LOGGING_FORMAT = "[%(asctime)s] (%(levelname)s) %(message)s"
-SIGMA = 2.0
 OF_LEVELS = 3
-OF_WINDOW_SIZE = 5
+OF_WIN_SIDE = 5
 OF_ITERS = 3
 OF_POLY_N = 5
-OF_POLY_SIGMA = 1.2
-RD_iters = 50
-RD_sigma = 1.0
-RD_mean = 0.0
+OF_SIGMA = 1.0
+RD_ITERS = 5
+RD_SIGMA = 1.0
 
 if __debug__:
     # In shared memory
@@ -267,24 +265,30 @@ class Denoising():
 
 class FlowDenoising(Denoising):
 
-    def __init__(self, number_of_processes, l, w, iters, sigma, verbosity):
+    def __init__(self,
+                 number_of_processes,
+                 l, w, RD_iters, RD_sigma,
+                 OF_iters,
+                 OF_poly_N,
+                 OF_sigma,
+                 verbosity):
         super().__init__(number_of_processes)
         self.l = l
         self.w = w
-        self.iters = iters
-        self.sigma = sigma
+        self.RD_iters = RD_iters
+        self.RD_sigma = RD_sigma
         self.image_denoiser = image_denoising.OF_random.Filter_Monochrome_Image(
             levels=l,
             window_side=w,
-            poly_sigma=1.5,
+            poly_sigma=OF_sigma,
             verbosity=verbosity)
 
     def filter_along_Z_slice(self, z):
 
         self.filtered_vol[z, :, :], _ = self.image_denoiser.filter(
             noisy_image=self.vol[z, :, :],
-            RD_iters=self.iters,
-            RD_sigma=self.sigma)
+            RD_iters=self.RD_iters,
+            RD_sigma=self.RD_sigma)
 
         if __debug__:
             progress.value += 1
@@ -293,8 +297,8 @@ class FlowDenoising(Denoising):
 
         self.filtered_vol[:, y, :], _ = self.image_denoiser.filter(
             noisy_image=self.vol[:, y, :],
-            RD_iters=self.iters,
-            RD_sigma=self.sigma)
+            RD_iters=self.RD_iters,
+            RD_sigma=self.RD_sigma)
 
         if __debug__:
             progress.value += 1
@@ -303,8 +307,8 @@ class FlowDenoising(Denoising):
 
         self.filtered_vol[:, :, x], _ = self.image_denoiser.filter(
             noisy_image=self.vol[:, :, x],
-            RD_iters=self.iters,
-            RD_sigma=self.sigma)
+            RD_iters=self.RD_iters,
+            RD_sigma=self.RD_sigma)
 
         if __debug__:
             progress.value += 1
@@ -329,27 +333,29 @@ parser.add_argument("-i", "--input", type=int_or_str,
 parser.add_argument("-o", "--output", type=int_or_str,
                     help="Output a MRC-file or a multi-image TIFF-file",
                     default="./denoised_volume.mrc")
-parser.add_argument("-s", "--sigma", nargs="+",
-                    help="Gaussian sigma for each dimension in the order (Z, Y, X)",
-                    default=(SIGMA, SIGMA, SIGMA))
-parser.add_argument("-l", "--levels", type=int_or_str,
+parser.add_argument("-s", "--OF_sigma", nargs="+",
+                    help="Standard deviation of the Gaussian basis used in the polynomial expansion for each dimension in the order (Z, Y, X)",
+                    default=(OF_SIGMA, OF_SIGMA, OF_SIGMA))
+parser.add_argument("-l", "--OF_levels", type=int_or_str,
                     help="Number of levels of the Gaussian pyramid used by the optical flow estimator",
                     default=OF_LEVELS)
-parser.add_argument("-w", "--winsize", type=int_or_str,
-                    help="Size of the window used by the optical flow estimator",
-                    default=OF_WINDOW_SIZE)
-parser.add_argument("-f", "--farneback_iters", type=int_or_str,
-                    help="Number of iterations of Farneback in each level of the pyramid",
-                    default=FARNEBACK_ITERS)
-parser.add_argument("-l", "--farneback_poly_n", type=int_or_str,
+parser.add_argument("-w", "--OF_win_side", type=int_or_str,
+                    help="Side of the window used in the OF estimator",
+                    default=OF_WIN_SIDE)
+parser.add_argument("-f", "--OF_iters", type=int_or_str,
+                    help="Number of iterations of the OF estimation algorithm in each level of the gaussian pyramid",
+                    default=OF_ITERS)
+parser.add_argument("-n", "--OF_poly_N", type=int_or_str,
                     help="Size of the pixel neighborhood used to find polynomial expansion in each pixel",
-                    default=FARNEBACK_POLY_N)
-parser.add_argument("-l", "--farneback_sigma", type=int_or_str,
-                    help="Standard deviation of the Gaussian basis used in the polynomial expansion",
-                    default=FARNEBACK_SIGMA)
+                    default=OF_POLY_N)
+parser.add_argument("-t", "--RD_iters", type=int_or_str,
+                    help="Number of iterations of the Random Denoising algorithm",
+                    default=RD_ITERS)
+parser.add_argument("-a", "--RD_sigma", type=int_or_str,
+                    help="Standard deviation of the Gaussian random number generator used to shuffle the pixels of the images",
+                    default=RD_SIGMA)
 parser.add_argument("-v", "--verbosity", type=int_or_str,
                     help=f"Verbosity level (chose between CRITICAL={logging.CRITICAL}, ERROR={logging.ERROR}, WARNING={logging.WARNING}, INFO={logging.INFO}, and DEBUG={logging.DEBUG})", default=logging.INFO)
-parser.add_argument("-n", "--no_OF", action="store_true", help="Disable optical flow compensation")
 parser.add_argument("-m", "--memory_map",
                     action="store_true",
                     help="Enable memory-mapping (see https://mrcfile.readthedocs.io/en/stable/usage_guide.html#dealing-with-large-files, only for MRC files)")
@@ -377,6 +383,7 @@ if __name__ == "__main__":
         fingerprint = hash_algorithm.hexdigest()
         print("fingerprint =", fingerprint)
 
+    '''
     if args.verbosity == 2:
         logging.basicConfig(format=LOGGING_FORMAT, level=logging.DEBUG)
         logging.info("Verbosity level = 2")
@@ -385,6 +392,7 @@ if __name__ == "__main__":
         logging.info("Verbosity level = 1")        
     else:
         logging.basicConfig(format=LOGGING_FORMAT, level=logging.CRITICAL)
+    '''
 
     if args.use_threads:
         from threading import Thread as Task
@@ -412,10 +420,10 @@ if __name__ == "__main__":
         logging.info("Using adjacent OF fields as predictions")
     '''
 
-    sigma = [float(i) for i in args.sigma]
-    logging.info(f"sigma={tuple(sigma)}")
-    l = args.levels
-    w = args.winsize
+    OF_sigma = [float(i) for i in args.OF_sigma]
+    logging.info(f"sigma={tuple(OF_sigma)}")
+    l = args.OF_levels
+    w = args.OF_win_side
     
     #logging.debug(f"Using transpose pattern {args.transpose} {type(args.transpose)}")
     #transpose_pattern = tuple([int(i) for i in args.transpose])
@@ -472,14 +480,12 @@ if __name__ == "__main__":
     if __debug__:
         time_0 = time.perf_counter()
 
-    if args.no_OF:
-        fd = GaussianDenoising(number_of_processes, kernels)
-    else:
-        iters = 5
-        sigma = 0.5
-        fd = FlowDenoising(number_of_processes,
-                           l, w, iters, sigma,
-                           args.verbosity)
+    fd = FlowDenoising(number_of_processes,
+                       l, w, args.RD_iters, args.RD_sigma,
+                       args.OF_iters,
+                       args.OF_poly_N,
+                       args.OF_sigma,
+                       args.verbosity)
 
     if __debug__:
         thread = threading.Thread(target=fd.feedback)
@@ -534,10 +540,10 @@ if __name__ == "__main__":
     fd.close()
     done = True
     print("done")
-    print(f"levels={l}")
-    print(f"window_side={w}")
-    print(f"Farneback iters={farneback_iters}")
-    print(f"Farneback poly_n={farneback_poly_n}")
-    print(f"Farneback poly_sigma={poly_sigma}")
-    print(f"RD iters={iters}")
-    print(f"RD sigmas={sigma}")
+    print(f"OF_levels={l}")
+    print(f"OF_win_side={w}")
+    print(f"OF_iters={args.OF_iters}")
+    print(f"OF_poly_N={args.OF_poly_N}")
+    print(f"OF_sigma={args.OF_sigma}")
+    print(f"RD_iters={args.RD_iters}")
+    print(f"RD_sigmas={args.RD_sigma}")
