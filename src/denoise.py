@@ -236,17 +236,21 @@ class Denoising():
             dtype=vol.dtype,
             buffer=self.SM_filtered_vol.buf)
         self.filtered_vol.fill(0)
-        #print("1", np.max(self.filtered_vol), self.filtered_vol.data)
         self.filter_along_Z()
-        #print("2", np.max(self.filtered_vol), self.filtered_vol.data)
-        #self.vol[...] = self.filtered_vol[...]
-        fvZ = self.filtered_vol.copy()
+        self.vol[...] = self.filtered_vol[...]
+        #fvZ = self.filtered_vol.copy()
+        #self.vol = np.transpose(self.vol, (1,0,2))
         self.filter_along_Y()
-        fvY = self.filtered_vol.copy()
-        #self.vol[...] = self.filtered_vol[...]
+        #self.vol = np.transpose(self.vol, (1,0,2))
+        #self.fvY = np.transpose(self.filtered_vol, (1,0,2))
+        #fvY = self.filtered_vol.copy()
+        self.vol[...] = self.filtered_vol[...]
+        #self.vol = np.transpose(self.vol, (2,1,0))
         self.filter_along_X()
-        fvX = self.filtered_vol.copy()
-        self.filtered_vol = (fvZ + fvY + fvX)/3
+        #self.vol = np.transpose(self.vol, (2,1,0))
+        #self.fvX = np.transpose(self.filtered_vol, (2,1,0))
+        #fvX = self.filtered_vol.copy()
+        #self.filtered_vol = (fvZ + fvY + fvX)/3
         return self.filtered_vol
         #return self.vol
 
@@ -481,7 +485,7 @@ if __name__ == "__main__":
         time_0 = time.perf_counter()
 
     fd = FlowDenoising(number_of_processes,
-                       l, w, args.RD_iters, args.RD_sigma,
+                       l, w, args.RD_iters, float(args.RD_sigma),
                        args.OF_iters,
                        args.OF_poly_N,
                        args.OF_sigma,
